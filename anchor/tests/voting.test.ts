@@ -32,5 +32,17 @@ describe('voting', () => {
         'who is the best player in the world?',
       )
       .rpc()
+
+    const [pollAddress] = PublicKey.findProgramAddressSync(
+      [new anchor.BN(1).toArrayLike(Buffer, 'le', 8)],
+      votingAddress,
+    )
+
+    const poll = await votingProgram.account.poll.fetch(pollAddress)
+    console.log(poll)
+
+    expect(poll.pollId.toNumber()).toEqual(1)
+    expect(poll.pollStart.toNumber()).toBeLessThan(poll.pollEnd.toNumber())
+    expect(poll.description).toEqual('who is the best player in the world?')
   })
 })
