@@ -9,8 +9,12 @@ const IDL = require('../target/idl/voting.json')
 const votingAddress = new PublicKey(IDL.address)
 
 describe('voting', () => {
-  it('initialize poll', async () => {
-    const context = await startAnchor(
+  let context
+  let provider
+  let votingProgram: Program<Voting>
+
+  beforeAll(async () => {
+    context = await startAnchor(
       '',
       [
         {
@@ -21,9 +25,11 @@ describe('voting', () => {
       [],
     )
 
-    const provider = new BankrunProvider(context)
-    const votingProgram = new Program<Voting>(IDL, provider)
+    provider = new BankrunProvider(context)
+    votingProgram = new Program<Voting>(IDL, provider)
+  })
 
+  it('initialize poll', async () => {
     await votingProgram.methods
       .initializePoll(
         new anchor.BN(1),
@@ -44,5 +50,33 @@ describe('voting', () => {
     expect(poll.pollId.toNumber()).toEqual(1)
     expect(poll.pollStart.toNumber()).toBeLessThan(poll.pollEnd.toNumber())
     expect(poll.description).toEqual('who is the best player in the world?')
+  })
+
+  it('initialize candidate', async () => {
+    await votingProgram.methods.initializeCandidate('messi', new anchor.BN(1)).rpc()
+    await votingProgram.methods.initializeCandidate('ronaldo', new anchor.BN(1)).rpc()
+
+    const [candidateAddress] = PublicKey.findProgramAddressSync(
+      [new anchor.BN(1).toArrayLike(Buffer, 'le', 8), Buffer.from('messi')],
+      votingAddress,
+    )
+    const candidate = await votingProgram.account.candidate.fetch(candidateAddress)
+    console.log(candidate)
+
+    expect(candidate.candidateName).toEqual('messi')
+    expect(candidate.candidateVotes.toNumber()).toEqual(0)
+  })
+
+  it('vote', async () => {
+    await votingProgram.methods.vote('messi', new anchor.BN(1)).rpc()
+
+    const [candidateAddress] = PublicKey.findProgramAddressSync(
+      [new anchor.BN(1).toArrayLike(Buffer, 'le', 8), Buffer.from('messi')],
+      votingAddress,
+    )
+
+    const candidate = await votingProgram.account.candidate.fetch(candidateAddress)
+    console.log(candidate)
+    expect(candidate.candidateVotes.toNumber()).toEqual(1)
   })
 })
